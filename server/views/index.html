@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>第三方接口测试</title>
+
+    <!--<link rel="stylesheet" href="/releaseTool/build/styles.css">-->
+</head>
+<body>
+<div id="app">
+    这是第三上传接口测试
+    <button class="startUpload">点我</button>
+
+
+
+</div>
+
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/cloudUpload.js"></script>
+<script>
+    $(function () {
+        var cloudUpload = $.fn.cloudUploader({
+            askUrl:'/api/getUpToken',
+            onOneSuccess:onOneSuccessOp
+        });
+        $(".startUpload").click(function(){
+            cloudUpload.start();
+        });
+
+        function onOneSuccessOp(info){
+            console.log(info);
+        }
+    });
+</script>
+
+</body>
+</html>
