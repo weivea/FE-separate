@@ -41,6 +41,10 @@ route.get('/webpage', function *(){
     //this.body = n + ' views';
 });
 
+route.get('/webpage/redirect', function *(){
+    this.redirect('back');
+});
+
 route.post('/api/test', function *(){
     this.body = {err:0,msg:'我是Server端，有个web端来请求我，我给了他个'+this.session.views+",你收到没？你刷新后该是"+(this.session.views+1)+"了！"};//n + ' views';
     //this.body = n + ' views';

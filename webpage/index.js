@@ -33,9 +33,34 @@ route.get('/webpage', function *(){
     delete re.header['content-type'];
     delete re.header['connection'];
     this.set(re.header);
-    var data = JSON.parse(re.data);
 
-    this.body = yield render('index',data);
+    if(re.header.location){
+        this.redirect(re.header.location);
+    }
+    else {
+        var data = JSON.parse(re.data);
+        this.body = yield render('index', data);
+    }
+
+});
+
+route.get('/webpage/redirect', function *(){
+    //this.body = yield render('index');
+    //var this_ = this;
+    var re = yield proxyThunk(this);
+    delete re.header['content-length'];
+    delete re.header['content-type'];
+    delete re.header['connection'];
+    this.set(re.header);
+
+    if(re.header.location){
+        this.redirect(re.header.location);
+    }
+    else{
+        var data = JSON.parse(re.data);
+        this.body = "哈哈啊哈，呵呵呵";
+    }
+
 });
 
 //route.post('/api/getUpToken', function *(){
