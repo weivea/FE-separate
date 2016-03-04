@@ -10,6 +10,7 @@ var route = require('koa-router')();
 var parse = require('co-body');
 var views = require('co-views');
 var http = require('http');
+var urlTool = require('url');
 var thunkify = require('thunkify');
 //var ursa = require('ursa');
 var post = thunkify(require('request').post);
@@ -24,6 +25,7 @@ var render = views('views', {
 app.use(serve('public'));
 
 var proxyThunk = thunkify(proxy);
+var proxyThunk2 = thunkify(proxy2);
 
 route.get('/webpage', function *(){
     //this.body = yield render('index');
@@ -58,10 +60,60 @@ route.get('/webpage/redirect', function *(){
     }
     else{
         var data = JSON.parse(re.data);
-        this.body = "哈哈啊哈，呵呵呵";
+        this.body = yield render('index', data);
     }
 
 });
+
+
+
+route.get('/webpage/laravel', function *(){
+    //this.body = yield render('index');
+    //var this_ = this;
+    var re = yield proxyThunk2(this);
+    delete re.header['content-length'];
+    delete re.header['content-type'];
+    delete re.header['connection'];
+    this.set(re.header);
+
+    if(re.header.location){
+        this.redirect(re.header.location);
+    }
+    else{
+        var data = JSON.parse(re.data);
+        this.body = yield render('laravel',data);
+        //this.body = re.data;
+    }
+
+});
+
+route.get('/webpage/laravel2', function *(){
+    //this.body = yield render('index');
+    //var this_ = this;
+    var re = yield proxyThunk2(this);
+    delete re.header['content-length'];
+    delete re.header['content-type'];
+    delete re.header['connection'];
+    this.set(re.header);
+
+    if(re.header.location){
+        var url = urlTool.parse(re.header.location);
+        var aa =  urlTool.parse('/laravel');
+        aa.pathname = '/webpage'+aa.pathname;
+        var ssString = urlTool.format(aa);
+        //url.path = '/webpage'+url.path;
+        url.pathname = '/webpage'+url.pathname;
+        var urlString = urlTool.format(url);
+        this.redirect(urlString);
+    }
+    else{
+        //var data = JSON.parse(re.data);
+        this.body = re.data;
+    }
+
+});
+
+
 
 //route.post('/api/getUpToken', function *(){
 //    //this.body = yield render('index');
@@ -119,7 +171,40 @@ function proxy(ctx, cb){
     });
 }
 
+function proxy2(ctx, cb){
+    counter++;
+    var num = counter;
+    var opt = {
+        host:     ctx.req.headers.host,
+        //port:       5000,
+        agent:    false,
+        path:     getPath(ctx.req).replace('/webpage',''),
+        method:   ctx.req.method,
+        headers:  getHeader(ctx.req)
+    };
+    log('#%d\t%s http://%s%s', num, ctx.req.method, opt.host, opt.path);
+    var req2 = http.request(opt, function (res2) {
+        //console.log(res2);
+        serverData = '';
+        res2.on('data', function (chunk) {
+            //console.log('BODY: ' + chunk);
+            serverData += chunk;
+        });
+        res2.on('end', function() {
+            cb(null,{data:serverData,header:res2.headers});
+        })
 
+    });
+    if (/POST|PUT/i.test(ctx.req.method)) {
+        ctx.req.pipe(req2);
+    } else {
+        req2.end();
+    }
+    req2.on('error', function (err) {
+        log('#%d\tERROR: %s', num, err.stack);
+        //res.end(err.stack);
+    });
+}
 
 // 获取请求的headers，去掉host和connection
 function getHeader (req) {
