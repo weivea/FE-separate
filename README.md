@@ -31,6 +31,7 @@
 
 
 1、nginx配置：
+
 ```shell
   server {
       listen 80;
@@ -64,6 +65,7 @@
 ![Alt 图片](img/webliucheng.png)
 
 //这是在，web与server在同一台机器上的解决办法。
+
 ```javascript
 
 //关键之处就是我们要正确合适的传递header内容，做一个nice的proxy
@@ -102,7 +104,9 @@ function proxy(ctx, cb){//ctx是http请求中的上下文，主要为获得其�
 }
 
 ```
+
 //这是在，web与server可能不在同一台机器上时。
+
 ```javascript
 
 //关键之处就是我们要正确合适的传递header内容，做一个nice的proxy
@@ -141,6 +145,7 @@ function proxy(ctx, cb){//ctx是http请求中的上下文，主要为获得其�
 }
 
 ```
+
 3、server端的处理：
 + 不用套模板了；
 + 不用管理模板了；
@@ -154,6 +159,7 @@ function proxy(ctx, cb){//ctx是http请求中的上下文，主要为获得其�
 + /webpage为web端项目
 
 配置好nginx
+
 ```
     cd server
     npm install
@@ -163,6 +169,7 @@ function proxy(ctx, cb){//ctx是http请求中的上下文，主要为获得其�
     npm install
     ndoe index.js
 ```
+
 浏览器访问http://proxy.test.com/webpage/
 
 #### 四、未实践但是可以想象的，
@@ -178,3 +185,5 @@ function proxy(ctx, cb){//ctx是http请求中的上下文，主要为获得其�
 
 以上观点，是在阅读「midway 前后端分离的思考与实践」相关文章后结合自身的不爽的自我总结与部分实践。是比较初级的实践与想法。
 欢迎大家来吐槽填坑:)，有新方案的一定要联系我QQ:550281353;招聘记得发红包至微信:weivea
+
+#### ps:现已增加php-laravel作为服务端
