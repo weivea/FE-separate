@@ -33,31 +33,76 @@
 1、nginx配置：
 
 ```shell
+
+#转发配置
   server {
-      listen 80;
-      server_name  proxy.test.com;
-      #server_name _;
+    listen 80;
+    server_name  proxy.xiaoying.com;
+    #server_name _;
 
-      access_log  /usr/local/var/log/nginx/proxy.xiaoying.log  main;
+    #root   /Users/weijianli/Work/proxy-test/laravel/public;
+    #index  index.php index.html index.htm;
+    access_log  /usr/local/var/log/nginx/proxy.xiaoying.log  main;
 
-      #转发给web（nodejs）端
-      location /webpage/ {
-            proxy_pass serverHost;#服务端的请求host(包括端口号)
-            proxy_set_header Host       $http_host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header REMOTE-HOST $remote_addr;
-            proxy_set_header   X-Forwarded-For  $proxy_add_x_forwarded_for;
-      }
+    location ^~ / {
+        #proxy_redirect off;
+        proxy_pass_header X-CSRF-TOKEN;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-NginX-Proxy true;
+        proxy_set_header Host $host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_pass_header Set-Cookie;
+        proxy_pass http://localhost:4000/;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        #proxy_redirect http:// https://;
+    }
+    location /api/ {
+        #proxy_redirect off;
+        proxy_pass_header X-CSRF-TOKEN;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-NginX-Proxy true;
+        proxy_set_header Host $host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_pass_header Set-Cookie;
+        proxy_pass http://localhost:5000/api/;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        #proxy_redirect http:// https://;
+    }
 
-      #转发给server端（php、java、Python、node、c++）
-      location /api/{
-            proxy_pass webHost;#web端的请求host(包括端口号)
-            proxy_set_header Host       $http_host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header REMOTE-HOST $remote_addr;
-            proxy_set_header   X-Forwarded-For  $proxy_add_x_forwarded_for;
-      }
-  }
+    location ^~ /api2/ {
+        proxy_pass_header X-CSRF-TOKEN;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-NginX-Proxy true;
+        proxy_set_header Host $host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_pass_header Set-Cookie;
+        proxy_pass http://proxy.xiaoying.com:10001/api2/;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+#laravel服务
+server {
+    listen 10001;
+    server_name  proxy.xiaoying.com;
+
+    root   /Users/weijianli/Work/proxy-test/laravel/public;
+    index  index.php index.html index.htm;
+    access_log  /usr/local/var/log/nginx/proxy10001.xiaoying.log  main;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php {
+        fastcgi_pass 127.0.0.1:9000;
+        try_files $uri /index.php = 404;
+        fastcgi_param SCRIPT_FILENAME  $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+}
 ```
 
 2、web端的处理
@@ -110,40 +155,80 @@ function proxy(ctx, cb){//ctx是http请求中的上下文，主要为获得其�
 ```javascript
 
 //关键之处就是我们要正确合适的传递header内容，做一个nice的proxy
-function proxy(ctx, cb){//ctx是http请求中的上下文，主要为获得其中的req,可以稍作修改，直接传入req
-    var opt = {
-        host:     serverHost,
-        port:     serverPort,
-        agent:    false,
-        path:     changPath(getPath(ctx.req)),//修改path，例如("/webpage/user_info" transport to "/api/user_info" )
-        method:   ctx.req.method,
-        headers:  getHeader(ctx.req)
-    };
-    log('#%d\t%s http://%s%s', num, ctx.req.method, opt.host, opt.path);
-    var req2 = http.request(opt, function (res2) {
-        //console.log(res2);
-        var serverData = '';
-        res2.on('data', function (chunk) {
-            //console.log('BODY: ' + chunk);
-            serverData += chunk;
-        });
-        res2.on('end', function() {
-            //回调函数，拿到server端传来的数据，选染成你想要的样子，或是直接转发给浏览器，记得setHeader
-            cb(null,{data:serverData,header:res2.headers});
-        })
+const template = require('art-template');
+const http = require("http");
+const url = require("url");
+const util = require('util');
+const buffertools = require('buffertools');
+const proxyCfg = require('./proxyCfg');
+template.config('cache', false);
 
+/**
+ * 模板代理方法
+ * params:
+ * sreq:服务请求实例
+ * sres:服务返回实例
+ *
+ * */
+function proxyFun(sreq, sres) {
+  if(sreq.method == 'GET'){
+    var url_parts = url.parse(sreq.url);
+    var opts = {
+      host: proxyCfg.server.host,
+      port: proxyCfg.server.port,
+      path: url_parts.path + (url_parts.hash || ''),
+      headers: sreq.headers
+    };
+    var chunkBuffers = [];
+    var re;
+    var creq = http.get(opts, (cres) => {
+      if (cres.statusCode != 200) {
+        sres.writeHead(cres.statusCode, cres.headers);
+        cres.pipe(sres);
+      } else {
+        cres.on('data', (chunk) => {
+            chunkBuffers.push(chunk);
+          })
+          .on("end", function () {
+            if(chunkBuffers.length ==0){
+              re = '';
+            } else if(chunkBuffers.length>1){
+              re = buffertools.concat(...chunkBuffers).toString();
+            }else {
+              re = chunkBuffers[0].toString()
+            }
+            try{
+              re = JSON.parse(re)
+            }catch (e){
+              util.log('data can`t be parsed:'+re);
+              re = {err:1,str:'data can`t be parsed'};
+            }
+            delete cres.headers['connection'];
+            delete cres.headers['content-type'];
+            delete cres.headers['content-length'];
+            sres.writeHead(cres.statusCode, cres.headers);
+            if(re){
+              sres.end(template(__dirname + proxyCfg.proxyView[url_parts.pathname],re));
+            }else{
+              sres.end('');
+            }
+          });
+      }
+    }).on('error', (e) => {
+      util.log(`Got error: ${e.message}`);
+      sres.writeHead(502, {'Content-Type': 'text/plain'});
+      sres.end(JSON.stringify(e));
     });
-    if (/POST|PUT/i.test(ctx.req.method)) {
-        ctx.req.pipe(req2);
-    } else {
-        req2.end();
-    }
-    req2.on('error', function (err) {
-        log('#%d\tERROR: %s', num, err.stack);
-        //res.end(err.stack);
-    });
+    sreq.pipe(creq);
+  }else {
+    var err = `error request method: ${JSON.stringify(sreq)}`;
+    util.log(err);
+    sres.writeHead(405, {'Content-Type': 'text/plain'});
+    sres.end(err);
+  }
 }
 
+module.exports = proxyFun
 ```
 
 3、server端的处理：
@@ -165,7 +250,7 @@ function proxy(ctx, cb){//ctx是http请求中的上下文，主要为获得其�
     npm install
     node index.js
 
-    cd webpage
+    cd webpage2
     npm install
     ndoe index.js
 ```
@@ -186,4 +271,4 @@ function proxy(ctx, cb){//ctx是http请求中的上下文，主要为获得其�
 以上观点，是在阅读「midway 前后端分离的思考与实践」相关文章后结合自身的不爽的自我总结与部分实践。是比较初级的实践与想法。
 欢迎大家来吐槽填坑:)，有新方案的一定要联系我QQ:550281353;招聘记得发红包至微信:weivea
 
-#### ps:现已增加php-laravel作为服务端
+#### ps:现已增加php-laravel作为服务端，请使用webpage2

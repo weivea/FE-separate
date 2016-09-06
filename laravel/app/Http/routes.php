@@ -12,9 +12,9 @@
 */
 use Illuminate\Http\Request;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+//Route::get('/', function () {
+//    return view('welcome');
+//});
 
 
 
@@ -31,7 +31,6 @@ Route::get('/', function () {
 */
 
 Route::group(['middleware' => ['web']], function () {
-    //
 
     Route::get('/laravel', function (Request $request) {
         // 从 session 中获取数据...
@@ -39,8 +38,15 @@ Route::group(['middleware' => ['web']], function () {
         $value = $value?($value+1):1;
         // 存储数据到 session...
         $request->session()->put('viewCnt', $value);
-
-        return response()->json(['words'=>'你好,我是laravel后台,这是第'.$value.'次浏览']);
+        return response()->json(['words'=>'你好,我是laravel后台,这是第'.$value.'次浏览','csrf'=>csrf_token()]);
+    });
+    Route::post('/api2/ajax', function (Request $request) {
+        // 从 session 中获取数据...
+        $value = $request->session()->get('viewCnt',0);
+        $value = $value?($value+1):1;
+        // 存储数据到 session...
+        $request->session()->put('viewCnt', $value);
+        return response()->json(['words'=>'你好,我是laravel后台,这是第'.$value.'次请求']);
     });
 
     Route::get('/laravel2', function () {

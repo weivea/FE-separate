@@ -37,7 +37,12 @@ route.get('/webpage', function *(){
     var n = this.session.views || 0;
     this.session.views = ++n;
     console.log(this.originalUrl);
-    this.body = {views:n};//n + ' views';
+
+    var testData = '1234567890';
+    for(var i = 0;i<10000;i++){
+        testData = testData+'1234567890'
+    }
+    this.body = {views:n,testData:testData};//n + ' views';
     //this.body = n + ' views';
 });
 
